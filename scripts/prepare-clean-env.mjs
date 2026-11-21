@@ -9,7 +9,11 @@ const backup = process.argv[2];
 if (!backup) throw new Error('Pass frozen backup directory');
 const baseline = JSON.parse(readFileSync(join(backup, 'zero-baseline.json')));
 assert.equal(baseline.folderId, required('YC_FOLDER_ID'));
-for (const [kind, count] of Object.entries(baseline.counts)) assert.equal(count, kind === 'accounts' ? 1 : 0);
+for (const [kind, count] of Object.entries(baseline.counts)) {
+  const expected = kind === 'accounts' ? (baseline.preservedAccountIds?.length ?? 1)
+    : kind === 'buckets' && baseline.preservedStateBucket ? 1 : 0;
+  assert.equal(count, expected);
+}
 const manifest = JSON.parse(readFileSync(join(backup, 'manifest.json')));
 const old = parseEnv(readFileSync(join(backup, 'original.env'), 'utf8'));
 const deployment = JSON.parse(readFileSync(join(backup, 'deployment.json')));

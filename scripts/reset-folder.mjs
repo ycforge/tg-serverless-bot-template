@@ -15,6 +15,8 @@ if (resolve(backup).startsWith(resolve(root))) throw new Error('Backup must be o
 const manifest = JSON.parse(readFileSync(join(backup, 'manifest.json')));
 const inventory = JSON.parse(readFileSync(join(backup, 'inventory.json')));
 const folderId = required('YC_FOLDER_ID');
+const stateBucket = required('TF_STATE_BUCKET');
+const stateAccount = phase === 'destroy' ? required('TF_STATE_SERVICE_ACCOUNT_ID') : undefined;
 assert.equal(manifest.complete, true);
 assert.equal(confirmedFolder, folderId);
 assert.equal(inventory.folderId, folderId);
@@ -24,6 +26,8 @@ for (const [path, hash] of Object.entries(manifest.hashes)) {
 const deployer = JSON.parse(readFileSync(required('YC_SERVICE_ACCOUNT_KEY_FILE'))).service_account_id;
 assert.equal(deployer, manifest.deployerId);
 if (!inventory.resources.accounts.some((a) => a.id === deployer)) throw new Error('Deployer identity not in snapshot');
+const preservedAccounts = new Set([deployer, stateAccount].filter(Boolean));
+const preservedAccountIds = inventory.resources.accounts.filter((a) => preservedAccounts.has(a.id)).map((a) => a.id).sort();
 async function remove(url) {
   try { await waitOperation(await api(url, 'DELETE')); }
   catch (error) { if (!error.message.endsWith('HTTP 404')) throw error; }
@@ -47,6 +51,7 @@ if (phase === 'freeze') {
   if (inventory.resources.gateways.length || inventory.resources.triggers.length) throw new Error('Use a frozen backup taken after ingress removal');
   if (inventory.resources.instances.length || inventory.resources.networks.length) throw new Error('Unsupported non-serverless resources in snapshot');
   for (const bucket of inventory.resources.buckets) {
+    if (bucket.name === stateBucket) continue;
     if (bucket.versioning && bucket.versioning !== 'VERSIONING_DISABLED') throw new Error('Versioned bucket requires a dedicated backup/delete workflow');
     yc(['storage', 's3', 'rm', `s3://${bucket.name}/`, '--recursive', '--only-show-errors']);
   }
@@ -70,12 +75,12 @@ if (phase === 'freeze') {
     yc(['kms', 'symmetric-key', 'delete', key.id], true);
   }
   const bindings = await api(`https://resource-manager.api.cloud.yandex.net/resource-manager/v1/folders/${folderId}:listAccessBindings`);
-  const oldAccounts = new Set(inventory.resources.accounts.filter((a) => a.id !== deployer).map((a) => a.id));
+  const oldAccounts = new Set(inventory.resources.accounts.filter((a) => !preservedAccounts.has(a.id)).map((a) => a.id));
   const deltas = bindings.accessBindings.filter((b) => b.subject.type === 'serviceAccount' && oldAccounts.has(b.subject.id))
     .map((accessBinding) => ({ action: 'REMOVE', accessBinding }));
   if (deltas.length) await waitOperation(await api(`https://resource-manager.api.cloud.yandex.net/resource-manager/v1/folders/${folderId}:updateAccessBindings`, 'POST', { accessBindingDeltas: deltas }));
   for (const account of inventory.resources.accounts) {
-    if (account.id !== deployer) await remove(`https://iam.api.cloud.yandex.net/iam/v1/serviceAccounts/${account.id}`);
+    if (!preservedAccounts.has(account.id)) await remove(`https://iam.api.cloud.yandex.net/iam/v1/serviceAccounts/${account.id}`);
   }
   // Verify the zero baseline rather than assuming deletion succeeded.
   const endpoints = {
@@ -91,12 +96,14 @@ if (phase === 'freeze') {
   for (const [kind, [url, field]] of Object.entries(endpoints)) {
     const response = await api(`${url}?folderId=${folderId}`);
     const items = response[field] || [];
-    if (kind === 'accounts') assert.deepEqual(items.map((a) => a.id), [deployer]);
+    if (kind === 'accounts') assert.deepEqual(items.map((a) => a.id).sort(), preservedAccountIds);
     else assert.equal(items.length, 0, `Remaining ${kind}`);
     counts[kind] = items.length;
   }
-  assert.equal(JSON.parse(yc(['storage', 'bucket', 'list'], true)).length, 0);
-  counts.buckets = 0;
-  writeFileSync(join(backup, 'zero-baseline.json'), JSON.stringify({ folderId, preservedDeployer: deployer, verifiedAt: new Date().toISOString(), counts, logging: { excluded: true, reason: 'Cloud Logging is deliberately not used; application logs are stdout only.' } }, null, 2), { mode: 0o600 });
+  const remainingBuckets = JSON.parse(yc(['storage', 'bucket', 'list'], true));
+  const preservedStateBucket = inventory.resources.buckets.some((bucket) => bucket.name === stateBucket) ? stateBucket : '';
+  assert.deepEqual(remainingBuckets.map((bucket) => bucket.name).sort(), preservedStateBucket ? [stateBucket] : []);
+  counts.buckets = remainingBuckets.length;
+  writeFileSync(join(backup, 'zero-baseline.json'), JSON.stringify({ folderId, preservedDeployer: deployer, preservedAccountIds, preservedStateBucket, verifiedAt: new Date().toISOString(), counts, logging: { excluded: true, reason: 'Cloud Logging is deliberately not used; application logs are stdout only.' } }, null, 2), { mode: 0o600 });
   console.log('Zero baseline verified:', JSON.stringify(counts));
 }

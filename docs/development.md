@@ -11,9 +11,15 @@ npm test
 npm run build
 ```
 
-Для этих проверок рабочая `.env`, токен и облачная инфраструктура не нужны. Локальные тесты используют синтетические данные Telegram и подменяют сетевые вызовы бота и Worker. `npm test` предварительно компилирует API, чтобы проверить настоящий YC HTTP-адаптер.
+Для этих проверок рабочая `.env`, токен, Terraform state и облачная инфраструктура не нужны. Локальные тесты используют синтетические данные Telegram и подменяют сетевые вызовы бота и Worker. `npm test` предварительно компилирует API, чтобы проверить настоящий YC HTTP-адаптер.
 
 Сборка создаёт `apps/*/dist` и архивы `build/api.zip`, `build/bot.zip`. Архив API содержит JS, manifests и lock-файл; зависимости устанавливает сборщик Cloud Functions. `node_modules` в архив не включается.
+
+## GitHub Actions
+
+Workflow [.github/workflows/ci.yml](../.github/workflows/ci.yml) запускается на `push` и `pull_request`. Он использует Node.js из [.nvmrc](../.nvmrc), выполняет `npm ci`, `npm run typecheck`, `npm test` и `npm run build`, имеет `contents: read`, timeout и concurrency. Облачные credentials, `secrets.*`, OIDC и deployment-шаги в workflow отсутствуют. Это проверка кода и сборки, а не развёртывание и не проверка живого стенда.
+
+Для Terraform без облачных изменений можно отдельно выполнить `terraform -chdir=infra fmt -check` и `terraform -chdir=infra validate` после `init` с backend config; для последнего нужны state-бакет и S3 credentials. Локальные npm-проверки от них не зависят.
 
 ## Локальный фронтенд
 

@@ -1,5 +1,18 @@
 import { Injectable, ConflictException } from '@nestjs/common';
 
+export const YDB_INT64_MIN = -(2n ** 63n);
+export const YDB_INT64_MAX = 2n ** 63n - 1n;
+
+export function applyCounterDelta(current: bigint, delta: bigint): bigint {
+  const next = current + delta;
+  if (next < YDB_INT64_MIN || next > YDB_INT64_MAX) {
+    throw new ConflictException(
+      `Counter value is outside the YDB Int64 range (${YDB_INT64_MIN}..${YDB_INT64_MAX})`,
+    );
+  }
+  return next;
+}
+
 @Injectable()
 export class CounterService {
   private database?: Promise<any>;
@@ -32,8 +45,7 @@ export class CounterService {
         if (BigInt(operations[0].delta) !== BigInt(delta)) throw new ConflictException('Operation ID conflict');
         return { value: current.toString() };
       }
-      const next = current + BigInt(delta);
-      if (next < -1000000000n || next > 1000000000n) throw new ConflictException('Counter limit reached');
+      const next = applyCounterDelta(current, BigInt(delta));
       await tx`UPSERT INTO tg_example_counters (user_id, value) VALUES (${userId}, ${next})`;
       await tx`UPSERT INTO tg_example_operations (user_id, operation_id, delta) VALUES (${userId}, ${operationId}, ${BigInt(delta)})`;
       return { value: next.toString() };

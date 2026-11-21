@@ -1,5 +1,5 @@
 {
-  "name": "telegram-serverless-bot-example",
+  "name": "telegram-serverless-bot-template",
   "version": "0.1.0",
   "private": true,
   "engines": {
@@ -14,6 +14,8 @@
     "pretest": "npm run build --workspace @example/api",
     "test": "node --import tsx --test tests/*.test.ts",
     "dev": "npm run dev --workspace @example/web",
+    "infra:bootstrap": "node scripts/bootstrap-state.mjs",
+    "infra:state:migrate": "node scripts/infra.mjs migrate",
     "infra:plan": "node scripts/infra.mjs plan",
     "infra:apply": "node scripts/infra.mjs apply",
     "deploy:apps": "node scripts/deploy.mjs",

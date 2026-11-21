@@ -33,6 +33,14 @@ export function yc(args, json = false) {
 export function outputs() {
   const result = run('terraform', ['-chdir=infra', 'output', '-json', 'deployment'], {
     encoding: 'utf8', stdio: 'pipe', maxBuffer: 1024 * 1024,
+    env: { ...process.env, TF_IN_AUTOMATION: 'true' },
   });
   return JSON.parse(result);
+}
+
+export function statePull() {
+  return run('terraform', ['-chdir=infra', 'state', 'pull'], {
+    encoding: 'utf8', stdio: 'pipe', maxBuffer: 64 * 1024 * 1024,
+    env: { ...process.env, TF_IN_AUTOMATION: 'true' },
+  });
 }

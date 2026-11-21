@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync, readFileSync, cpSync, readdirSync, statSync, 
 import { resolve, join, relative } from 'node:path';
 import { createHash } from 'node:crypto';
 import { api, root, required, iamToken } from './lib/cloud.mjs';
-import { yc, outputs, run } from './lib/process.mjs';
+import { yc, outputs, run, statePull } from './lib/process.mjs';
 import { Driver } from '@ydbjs/core';
 import { query } from '@ydbjs/query';
 import { AccessTokenCredentialsProvider } from '@ydbjs/auth/access-token';
@@ -60,7 +60,9 @@ save('inventory.json', inventory);
 save('deployment.json', outputs());
 save('folder-iam.json', await api(`https://resource-manager.api.cloud.yandex.net/resource-manager/v1/folders/${folderId}:listAccessBindings`));
 cpSync(join(root, '.env'), join(destination, 'original.env'));
-cpSync(join(root, 'infra/terraform.tfstate'), join(destination, 'terraform.tfstate'));
+const state = statePull();
+JSON.parse(state);
+writeFileSync(join(destination, 'terraform.tfstate'), state, { mode: 0o600 });
 run('git', ['archive', '--format=tar', '-o', join(destination, 'source-before-reset.tar'), 'HEAD']);
 
 let payloadCount = 0;
