@@ -1,0 +1,6 @@
+{
+  "name": "@example/bot",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": { "build": "tsc", "typecheck": "tsc --noEmit" }
+}

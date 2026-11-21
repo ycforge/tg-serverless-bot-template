@@ -1,0 +1,22 @@
+node_modules/
+dist/
+build/
+.env
+.env.*
+!.env.example
+.secrets/
+.local/
+infra/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+!*.tfvars.example
+crash.log
+.DS_Store
+coverage/
+
+# Cloudflare Wrangler local state and secrets
+.wrangler/
+.dev.vars
+.dev.vars.*

@@ -1,0 +1,48 @@
+openapi: 3.0.0
+info:
+  title: Telegram Serverless Bot Example
+  version: 1.0.0
+paths:
+  /api/{proxy+}:
+    x-yc-apigateway-any-method:
+      parameters:
+        - name: proxy
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: API response
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${api_function_id}
+        tag: $latest
+        service_account_id: ${invoker_id}
+        payload_format_version: '2.0'
+  /:
+    get:
+      responses:
+        '200':
+          description: Mini App
+      x-yc-apigateway-integration:
+        type: object_storage
+        bucket: ${bucket}
+        object: index.html
+        service_account_id: ${frontend_reader_id}
+  /{file+}:
+    get:
+      parameters:
+        - name: file
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Frontend asset
+      x-yc-apigateway-integration:
+        type: object_storage
+        bucket: ${bucket}
+        object: '{file}'
+        service_account_id: ${frontend_reader_id}

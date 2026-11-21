@@ -1,0 +1,35 @@
+{
+  "name": "telegram-serverless-bot-example",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.15 <23"
+  },
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present && node scripts/package.mjs",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "pretest": "npm run build --workspace @example/api",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "dev": "npm run dev --workspace @example/web",
+    "infra:plan": "node scripts/infra.mjs plan",
+    "infra:apply": "node scripts/infra.mjs apply",
+    "deploy:apps": "node scripts/deploy.mjs",
+    "trigger:ensure": "node scripts/trigger.mjs",
+    "deploy": "npm run build && npm run infra:apply && npm run deploy:apps && npm run trigger:ensure",
+    "verify": "node scripts/verify.mjs"
+  },
+  "devDependencies": {
+    "@types/jsdom": "^21.1.7",
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "jsdom": "^26.1.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vite": "^7.0.0"
+  }
+}
